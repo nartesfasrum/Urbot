@@ -1,0 +1,8 @@
+#Config File
+
+shipUrl = ""
+shipCode = ""
+matrixRoom = ""
+matrixBotUser = ""
+matrixBotPass = ""
+matrixHomeServer = ""
