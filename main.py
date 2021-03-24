@@ -1,8 +1,13 @@
-import configparser, quinnat, asyncio
-from nio import AsyncClient, RoomMessageText
+import configparser, quinnat, asyncio, boto3, requests, os
+from nio import Api, AsyncClient, RoomMessageText, RoomMessageMedia
 
 config = configparser.ConfigParser()
 config.read('default.ini')
+
+s3Url = config['S3']['s3Url']
+s3AccessKey = config['S3']['s3AccessKey']
+s3SecretKey = config['S3']['s3SecretKey']
+s3Bucket = config['S3']['s3Bucket']
 
 matrixRoom = config['MATRIX']['matrixRoom']
 matrixBotUser = config['MATRIX']['matrixBotUser']
@@ -14,6 +19,17 @@ urbitId = config['URBIT']['urbitId']
 urbitCode = config['URBIT']['urbitCode']
 urbitHost = config['URBIT']['urbitHost']
 urbitBridgeChat = config['URBIT']['urbitBridgeChat']
+
+if not os.path.exists('storage'):
+    os.makedirs('storage')
+
+s3Client = boto3.resource(
+    service_name='s3',
+    aws_access_key_id=s3AccessKey,
+    aws_secret_access_key=s3SecretKey,
+    endpoint_url=s3Url
+)
+s3BucketUrl = s3Url + '/' + s3Bucket
 
 urbitClient = quinnat.Quinnat(urbitUrl, urbitId, urbitCode)
 
@@ -27,15 +43,30 @@ async def urbitListener(message, replier):
             }
     )
 
-async def matrixListener(room, event):
-    urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"Got message from {room.user_name(event.sender)} in {room.display_name}: {event.body}"})
+async def matrixTextListener(room, event):
+    urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"{room.user_name(event.sender)} in {room.display_name}: {event.body}"})
+
+async def matrixMediaListener(room, event):
+    urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"{room.user_name(event.sender)} in {room.display_name} sent media:"})
+
+    mxcSplit = event.url.split('/')
+    imageDownloadRequest = requests.get(matrixHomeServer + Api.download(mxcSplit[2], mxcSplit[3])[1])
+    with open('storage/' + event.body, 'wb') as f:
+        f.write(imageDownloadRequest.content)
+    s3Client.Bucket(s3Bucket).upload_file(
+            Filename = 'storage/' + event.body,
+            Key = event.body
+    )
+    s3AttachmentUrl = s3BucketUrl + '/' + event.body
+    urbitClient.post_message(urbitHost, urbitBridgeChat, {"url": f"{s3AttachmentUrl}"})
 
 async def main():
     urbitClient.connect()
 
     matrixClient = AsyncClient(matrixHomeServer, matrixBotUser)
     print(await matrixClient.login(matrixBotPass))
-    matrixClient.add_event_callback(matrixListener, RoomMessageText)
+    matrixClient.add_event_callback(matrixTextListener, RoomMessageText)
+    matrixClient.add_event_callback(matrixMediaListener, RoomMessageMedia)
 
     await matrixClient.sync_forever(timeout=30000)
 
