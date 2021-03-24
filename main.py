@@ -1,5 +1,5 @@
 import configparser, quinnat, asyncio, boto3, requests, os
-from nio import Api, AsyncClient, RoomMessageText, RoomMessageImage
+from nio import Api, AsyncClient, RoomMessageText, RoomMessageMedia
 
 config = configparser.ConfigParser()
 config.read('default.ini')
@@ -46,8 +46,8 @@ async def urbitListener(message, replier):
 async def matrixTextListener(room, event):
     urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"{room.user_name(event.sender)} in {room.display_name}: {event.body}"})
 
-async def matrixImageListener(room, event):
-    urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"{room.user_name(event.sender)} in {room.display_name} posted an image:"})
+async def matrixMediaListener(room, event):
+    urbitClient.post_message(urbitHost, urbitBridgeChat, {"text": f"{room.user_name(event.sender)} in {room.display_name} sent media:"})
 
     mxcSplit = event.url.split('/')
     imageDownloadRequest = requests.get(matrixHomeServer + Api.download(mxcSplit[2], mxcSplit[3])[1])
@@ -66,7 +66,7 @@ async def main():
     matrixClient = AsyncClient(matrixHomeServer, matrixBotUser)
     print(await matrixClient.login(matrixBotPass))
     matrixClient.add_event_callback(matrixTextListener, RoomMessageText)
-    matrixClient.add_event_callback(matrixImageListener, RoomMessageImage)
+    matrixClient.add_event_callback(matrixMediaListener, RoomMessageMedia)
 
     await matrixClient.sync_forever(timeout=30000)
 
