@@ -17,12 +17,5 @@
 			"matrix_room": "!matrixRoomTwo:matrix.example.org",
 			"urbit_channel": "urbit-channel-222"
 		}]
-	},
-	{
-		"type": "s3",
-		"s3_url": "https://s3.example.org",
-		"s3_bucket": "examplebucket",
-		"s3_key_access": "aaaaaa",
-		"s3_key_secret": "bbbbbb"
 	}]
 }]
