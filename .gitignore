@@ -351,5 +351,5 @@ MigrationBackup/
 
 # Project-specific files
 *.swp
-default.ini
+config.json
 storage/

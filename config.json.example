@@ -1,0 +1,28 @@
+[{
+	"client_ship": "zod",
+	"urbit_url": "http://127.0.0.1:8080",
+	"urbit_code": "dozzod-dozzod-dozzod-dozzod",
+	"bots": [{
+		"type": "matrix",
+		"matrix_homeserver": "https://matrix.example.org",
+		"matrix_bot_user": "@urbot:matrix.example.org",
+		"matrix_bot_pass": "P@ssw0rd",
+		"channels": [{
+			"resource_ship": "sampel-palnet",
+			"matrix_room": "!matrixRoom:matrix.example.org",
+			"urbit_channel": "urbit-channel-111"
+		},
+		{
+			"resource_ship": "zod",
+			"matrix_room": "!matrixRoomTwo:matrix.example.org",
+			"urbit_channel": "urbit-channel-222"
+		}]
+	},
+	{
+		"type": "s3",
+		"s3_url": "https://s3.example.org",
+		"s3_bucket": "examplebucket",
+		"s3_key_access": "aaaaaa",
+		"s3_key_secret": "bbbbbb"
+	}]
+}]

@@ -40,7 +40,7 @@ Install boto3 via `pip`:
 
 Set up a group on your Urbit for your bridge to reside in.
 
-Copy `example.ini` to `default.ini`, and modify it as appropriate to meet your needs.
+Copy `config.json.example` to `config.json`, and modify it as appropriate to meet your needs.
 
 Start the bridge:
 
