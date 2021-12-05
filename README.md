@@ -26,17 +26,9 @@ Note that this software is currently under development, and I am not responsible
 
 ## Setup
 
-Install Quinnat via `pip`:
+Install required dependencies:
 
-`pip3 install quinnat`
-
-Install matrix-nio via `pip`:
-
-`pip3 install matrix-nio`
-
-Install boto3 via `pip`:
-
-`pip3 install boto3`
+`pip3 install -r requirements.txt`
 
 Set up a group on your Urbit for your bridge to reside in.
 
