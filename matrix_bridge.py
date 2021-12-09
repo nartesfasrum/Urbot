@@ -2,7 +2,7 @@ import asyncio, os, quinnat
 from base_bridge import *
 from helpers import get_json_dump
 from multiprocessing import active_children, Process
-from nio import AsyncClient, MatrixRoom, RoomMessageText
+from nio import AsyncClient, ClientConfig, MatrixRoom, RoomMessageText
 
 class matrix_client(generic_bridge):
     def __init__(self, instance, urb_info):
@@ -14,7 +14,8 @@ class matrix_client(generic_bridge):
         self.bot_password = instance["matrix_bot_pass"]
         self.homeserver = instance["matrix_homeserver"]
         self.channel_list = []
-        self.matrixClient = AsyncClient(self.homeserver, self.bot_user)
+        self.config = ClientConfig(store_sync_tokens=True)
+        self.matrixClient = AsyncClient(self.homeserver, self.bot_user, device_id="urbot", store_path=instance["matrix_store_path"], config=self.config)
 
         for channel_group in instance["channels"]:
             self.channel_list.append(channel_group["matrix_room"])
@@ -78,7 +79,6 @@ class bridge():
         def urbit_listener(message, _):
             asyncio.run(urbit_message_handler(message, _))
 
-
         while True:
             try:
                 self.urbit_client.client.listen(urbit_listener)
@@ -121,6 +121,6 @@ async def main():
     
     bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_listener, RoomMessageText)
 
-    await bridge_instance.matrixClient.sync_forever(timeout=30000)
+    await bridge_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
 
 asyncio.get_event_loop().run_until_complete(main())

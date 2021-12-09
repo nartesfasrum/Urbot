@@ -7,6 +7,7 @@
 		"matrix_homeserver": "https://matrix.example.org",
 		"matrix_bot_user": "@urbot:matrix.example.org",
 		"matrix_bot_pass": "P@ssw0rd",
+		"matrix_store_path": "/full/path/to/store",
 		"channels": [{
 			"resource_ship": "sampel-palnet",
 			"matrix_room": "!matrixRoom:matrix.example.org",
