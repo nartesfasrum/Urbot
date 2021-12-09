@@ -86,11 +86,14 @@ class bridge():
                 self.urbit_client.reconnect()
                 continue
 
-    async def matrix_listener(self, room: MatrixRoom, event: RoomMessageText):
-        message_body = room.user_name(event.sender) + ": " + event.body
-        print("attempting to send message to Urbit...")
-        print("message to be sent: ", message_body)
-        print("message to channel: ")
+
+    async def matrix_message_handler(self, room: MatrixRoom, event: RoomMessageText):
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        for matched_channel in matched_channels:
+            message_body = room.user_name(event.sender) + ": " + event.body
+            print("attempting to send message to Urbit...")
+            print("message to be sent: ", message_body)
+            print("message to channel:", matched_channel["urbit_channel"])
 
 async def main():
     procs = []
@@ -119,7 +122,7 @@ async def main():
             urblistener_proc.start()
             procs.append(urblistener_proc)
     
-    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_listener, RoomMessageText)
+    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessageText)
 
     await bridge_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
 
