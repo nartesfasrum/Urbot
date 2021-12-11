@@ -2,7 +2,7 @@ import asyncio, os, quinnat
 from base_bridge import *
 from helpers import get_json_dump
 from multiprocessing import active_children, Process
-from nio import AsyncClient, ClientConfig, MatrixRoom, RoomMessage
+from nio import AsyncClient, ClientConfig, MatrixRoom, RoomMessageText
 
 class matrix_client(generic_bridge):
     def __init__(self, instance, urb_info):
@@ -67,6 +67,8 @@ class bridge():
         self.matrix_client = matrix_client
 
     def start(self):
+        for channel in self.instance["channels"]:
+            self.urbit_client.send(channel['resource_ship'], channel['urbit_channel'], "Urbot has connected to this channel!")
         async def urbit_message_handler(message, _):
             matched_ships = list(filter(lambda ship: ship["resource_ship"] == message.host_ship, self.instance["channels"]))
             if len(matched_ships) > 0:
@@ -89,7 +91,7 @@ class bridge():
                 continue
 
 
-    async def matrix_message_handler(self, room: MatrixRoom, event: RoomMessage):
+    async def matrix_message_handler(self, room: MatrixRoom, event: RoomMessageText):
         matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + ": " + event.body
@@ -125,7 +127,7 @@ async def main():
             urblistener_proc.start()
             procs.append(urblistener_proc)
     
-    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessage)
+    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessageText)
 
     await bridge_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
 
