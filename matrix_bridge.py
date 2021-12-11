@@ -2,7 +2,7 @@ import asyncio, os, quinnat
 from base_bridge import *
 from helpers import get_json_dump
 from multiprocessing import active_children, Process
-from nio import AsyncClient, ClientConfig, MatrixRoom, RoomMessageText
+from nio import AsyncClient, ClientConfig, MatrixRoom, RoomMessage
 
 class matrix_client(generic_bridge):
     def __init__(self, instance, urb_info):
@@ -42,6 +42,7 @@ class urbit_client:
                 self.instance["client_ship"],
                 self.instance["urbit_code"]
         )
+        print("connecting urbit_client...")
         self.client.connect()
 
     def send(self, resource_ship, channel, message):
@@ -81,19 +82,21 @@ class bridge():
 
         while True:
             try:
+                print("starting urbit listener...")
                 self.urbit_client.client.listen(urbit_listener)
             except UnicodeDecodeError:
                 self.urbit_client.reconnect()
                 continue
 
 
-    async def matrix_message_handler(self, room: MatrixRoom, event: RoomMessageText):
+    async def matrix_message_handler(self, room: MatrixRoom, event: RoomMessage):
         matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + ": " + event.body
             print("attempting to send message to Urbit...")
             print("message to be sent: ", message_body)
             print("message to channel:", matched_channel["urbit_channel"])
+            self.urbit_client.send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
 
 async def main():
     procs = []
@@ -122,7 +125,7 @@ async def main():
             urblistener_proc.start()
             procs.append(urblistener_proc)
     
-    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessageText)
+    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessage)
 
     await bridge_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
 
