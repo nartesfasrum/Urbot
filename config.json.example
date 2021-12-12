@@ -5,6 +5,7 @@
 	"bots": [{
 		"type": "matrix",
 		"matrix_homeserver": "https://matrix.example.org",
+		"matrix_store_path": "/full/path/to/store/",
 		"matrix_bot_user": "@urbot:matrix.example.org",
 		"matrix_bot_pass": "P@ssw0rd",
 		"s3_url": "https://s3.example.org",
