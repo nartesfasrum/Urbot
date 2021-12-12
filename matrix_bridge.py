@@ -1,7 +1,93 @@
 import asyncio, boto3, json, os, requests, sys, quinnat
 from helpers import get_json_dump
 from multiprocessing import active_children, Process
-from nio import Api, AsyncClient, ClientConfig, InviteEvent, LoginResponse, LocalProtocolError, MatrixRoom, MatrixUser, RoomEncryptedMedia, RoomMessageMedia, RoomMessageText, crypto, exceptions, RoomSendResponse
+from nio import Api, AsyncClient, ClientConfig, InviteEvent, LoginResponse, LocalProtocolError, MatrixRoom, MatrixUser, RoomEncryptedMedia, RoomMessageMedia, RoomMessageText, RoomSendResponse, crypto, exceptions
+
+class bridge:
+    def __init__(self, matrix_client, urbit_client, instance):
+        self.matrix_client = matrix_client
+        self.urbit_client = urbit_client
+        self.instance = instance
+
+        self.s3_client = boto3.resource(
+            service_name = 's3',
+            aws_access_key_id = self.instance["s3_key_access"],
+            aws_secret_access_key = self.instance["s3_key_secret"],
+            endpoint_url = self.instance["s3_url"]
+        )
+        self.s3_bucket_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"]
+
+        self.add_callbacks()
+
+        for channel in self.instance["channels"]:
+            self.urbit_client.message_send(channel['resource_ship'], channel['urbit_channel'], "Urbot has connected to this channel!")
+
+    def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
+        print(f"Joining invited room {room.name}...")
+        self.matrix_client.join(room.room_id)
+        room = self.matrix_client.rooms[ROOM_ID]
+        print(f"Is {room.name} encrypted: {room.encrypted}")
+
+    def cb_encrypted_media(self, room: MatrixRoom, event: RoomEncryptedMedia):
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        for matched_channel in matched_channels:
+            message_body = room.user_name(event.sender) + " sent an encrypted file: "
+            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
+
+            mxc_split = event.url.split('/')
+            image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
+            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
+                f.write(image_download_request.content)
+            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
+                Filename = self.instance["matrix_store_path"] + event.body,
+                Key = event.body
+            )
+            s3_attachment_url = self.s3_bucket_url + '/' + event.body
+            print("attempting to send media to Urbit...")
+            print("media to be sent: ", s3_attachment_url)
+            print("media to channel:", matched_channel["urbit_channel"])
+            self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
+
+    def cb_message_media(self, room: MatrixRoom, event: RoomMessageMedia):
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        for matched_channel in matched_channels:
+            message_body = room.user_name(event.sender) + " sent a file: "
+            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
+
+            mxc_split = event.url.split('/')
+            image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
+            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
+                f.write(image_download_request.content)
+            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
+                Filename = self.instance["matrix_store_path"] + event.body,
+                Key = event.body
+            )
+            s3_attachment_url = self.s3_bucket_url + '/' + event.body
+            print("attempting to send media to Urbit...")
+            print("media to be sent: ", s3_attachment_url)
+            print("media to channel:", matched_channel["urbit_channel"])
+            self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
+
+    def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
+        if event.decrypted:
+            encrypted_symbol = "e "
+        else:
+            encrypted_symbol = "u "
+        print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        for matched_channel in matched_channels:
+            message_body = room.user_name(event.sender) + ": " + event.body
+            print("attempting to send message to Urbit...")
+            print("message to be sent: ", message_body)
+            print("message to channel:", matched_channel["urbit_channel"])
+            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
+
+
+    def add_callbacks(self):
+        self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
+        self.matrix_client.add_event_callback(self.cb_encrypted_media, RoomEncryptedMedia)
+        self.matrix_client.add_event_callback(self.cb_message_media, RoomMessageMedia)
+        self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
 
 class MatrixClient(AsyncClient):
     def __init__(self, homeserver, user='', device_id='', store_path='', config=None, ssl=None, proxy=None, password='', session_details_file='matrix_credentials_cache.json'):
@@ -95,91 +181,6 @@ class UrbitClient:
         self.client.ship.delete()
         self.client = self.connect()
 
-class bridge:
-    def __init__(self, matrix_client, urbit_client, instance):
-        self.matrix_client = matrix_client
-        self.urbit_client = urbit_client
-        self.instance = instance
-
-        self.s3_client = boto3.resource(
-            service_name = 's3',
-            aws_access_key_id = self.instance["s3_key_access"],
-            aws_secret_access_key = self.instance["s3_key_secret"],
-            endpoint_url = self.instance["s3_url"]
-        )
-        self.s3_bucket_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"]
-
-        self.add_callbacks()
-
-        for channel in self.instance["channels"]:
-            self.urbit_client.message_send(channel['resource_ship'], channel['urbit_channel'], "Urbot has connected to this channel!")
-
-    def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
-        print(f"Joining invited room {room.name}...")
-        self.matrix_client.join(room.room_id)
-        room = self.matrix_client.rooms[ROOM_ID]
-        print(f"Is {room.name} encrypted: {room.encrypted}")
-
-    async def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
-        if event.decrypted:
-            encrypted_symbol = "e "
-        else:
-            encrypted_symbol = "u "
-        print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
-        for matched_channel in matched_channels:
-            message_body = room.user_name(event.sender) + ": " + event.body
-            print("attempting to send message to Urbit...")
-            print("message to be sent: ", message_body)
-            print("message to channel:", matched_channel["urbit_channel"])
-            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
-
-    async def cb_message_media(self, room: MatrixRoom, event: RoomMessageMedia):
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
-        for matched_channel in matched_channels:
-            message_body = room.user_name(event.sender) + " sent a file: "
-            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
-
-            mxc_split = event.url.split('/')
-            image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
-            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
-                f.write(image_download_request.content)
-            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
-                Filename = self.instance["matrix_store_path"] + event.body,
-                Key = event.body
-            )
-            s3_attachment_url = self.s3_bucket_url + '/' + event.body
-            print("attempting to send media to Urbit...")
-            print("media to be sent: ", s3_attachment_url)
-            print("media to channel:", matched_channel["urbit_channel"])
-            self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
-
-    async def cb_encrypted_media(self, room: MatrixRoom, event: RoomEncryptedMedia):
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
-        for matched_channel in matched_channels:
-            message_body = room.user_name(event.sender) + " sent an encrypted file: "
-            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
-
-            mxc_split = event.url.split('/')
-            image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
-            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
-                f.write(image_download_request.content)
-            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
-                Filename = self.instance["matrix_store_path"] + event.body,
-                Key = event.body
-            )
-            s3_attachment_url = self.s3_bucket_url + '/' + event.body
-            print("attempting to send media to Urbit...")
-            print("media to be sent: ", s3_attachment_url)
-            print("media to channel:", matched_channel["urbit_channel"])
-            self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
-
-    def add_callbacks(self):
-        self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
-        self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
-        self.matrix_client.add_event_callback(self.cb_message_media, RoomMessageMedia)
-        self.matrix_client.add_event_callback(self.cb_encrypted_media, RoomEncryptedMedia)
-
 async def run_matrix_client(client: MatrixClient):
     await client.login()
 
@@ -203,6 +204,7 @@ async def main():
             "client_ship": instance["client_ship"],
             "urbit_code": instance["urbit_code"]
         }
+
         for bot in instance["bots"]:
             matrix_config = ClientConfig(store_sync_tokens=True)
 
