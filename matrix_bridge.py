@@ -22,7 +22,7 @@ class bridge:
         print(f"Is {room.name} encrypted: {room.encrypted}")
 
     def cb_message_media(self, room, event):
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        matched_channels = self.match_channels(room)
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + " sent an encrypted file: "
             self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
@@ -30,23 +30,14 @@ class bridge:
             mxc_split = event.url.split('/')
             image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
             s3_attachment_url = self.s3_client.upload(event.body, image_download_request.content)
-            print("attempting to send media to Urbit...")
-            print("media to be sent: ", s3_attachment_url)
-            print("media to channel:", matched_channel["urbit_channel"])
+            self.log_urbit_message(s3_attachment_url, matched_channel["urbit_channel"])
             self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
 
     def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
-        if event.decrypted:
-            encrypted_symbol = "e "
-        else:
-            encrypted_symbol = "u "
-        print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        matched_channels = self.match_channels(room)
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + ": " + event.body
-            print("attempting to send message to Urbit...")
-            print("message to be sent: ", message_body)
-            print("message to channel:", matched_channel["urbit_channel"])
+            self.log_urbit_message(message_body, matched_channel["urbit_channel"])
             self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
 
     def add_callbacks(self):
@@ -54,6 +45,15 @@ class bridge:
         self.matrix_client.add_event_callback(self.cb_message_media, RoomEncryptedMedia)
         self.matrix_client.add_event_callback(self.cb_message_media, RoomMessageMedia)
         self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
+
+    def log_urbit_message(self, message, channel):
+        print("Attempting to forward event to Urbit...")
+        print("Event to be sent: ", message)
+        print("Event to channel: ", channel)
+
+    def match_channels(self, room):
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        return matched_channels
 
 class MatrixClient(AsyncClient):
     def __init__(self, homeserver, user='', device_id='', store_path='', config=None, ssl=None, proxy=None, password='', session_details_file='matrix_credentials_cache.json'):
