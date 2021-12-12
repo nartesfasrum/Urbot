@@ -56,18 +56,6 @@ class MatrixClient(AsyncClient):
             [print(f"\t{device.user_id}\t {device.device_id}\t {device.trust_state}\t  {device.display_name}") for device in device_store]
             sys.exit(1)
 
-    def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
-        print(f"Joining invited room {room.name}...")
-        self.join(room.room_id)
-        room = self.rooms[ROOM_ID]
-        print(f"Is {room.name} encrypted: {room.encrypted}")
-
-    async def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
-        if event.decrypted:
-            encrypted_symbol = "e "
-        else:
-            encrypted_symbol = "u "
-        print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
 
     @staticmethod
     def __write_details_to_disk(resp: LoginResponse):
@@ -111,10 +99,24 @@ class bridge:
     def __init__(self, matrix_client, urbit_client):
         self.matrix_client = matrix_client
         self.urbit_client = urbit_client
+        self.add_callbacks()
 
-        matrix_client.add_event_callback(matrix_client.cb_autojoin_room, InviteEvent)
-        matrix_client.add_event_callback(matrix_client.cb_message_text, RoomMessageText)
+    def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
+        print(f"Joining invited room {room.name}...")
+        self.matrix_clientjoin(room.room_id)
+        room = self.matrix_client.rooms[ROOM_ID]
+        print(f"Is {room.name} encrypted: {room.encrypted}")
 
+    async def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
+        if event.decrypted:
+            encrypted_symbol = "e "
+        else:
+            encrypted_symbol = "u "
+        print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
+
+    def add_callbacks(self):
+        self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
+        self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
 
 async def run_matrix_client(client: MatrixClient):
     await client.login()
