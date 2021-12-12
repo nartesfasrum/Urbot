@@ -21,24 +21,10 @@ class bridge:
         room = self.matrix_client.rooms[ROOM_ID]
         print(f"Is {room.name} encrypted: {room.encrypted}")
 
-    def cb_encrypted_media(self, room: MatrixRoom, event: RoomEncryptedMedia):
+    def cb_message_media(self, room, event):
         matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + " sent an encrypted file: "
-            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
-
-            mxc_split = event.url.split('/')
-            image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
-            s3_attachment_url = self.s3_client.upload(event.body, image_download_request.content)
-            print("attempting to send media to Urbit...")
-            print("media to be sent: ", s3_attachment_url)
-            print("media to channel:", matched_channel["urbit_channel"])
-            self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
-
-    def cb_message_media(self, room: MatrixRoom, event: RoomMessageMedia):
-        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
-        for matched_channel in matched_channels:
-            message_body = room.user_name(event.sender) + " sent a file: "
             self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
 
             mxc_split = event.url.split('/')
@@ -65,7 +51,7 @@ class bridge:
 
     def add_callbacks(self):
         self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
-        self.matrix_client.add_event_callback(self.cb_encrypted_media, RoomEncryptedMedia)
+        self.matrix_client.add_event_callback(self.cb_message_media, RoomEncryptedMedia)
         self.matrix_client.add_event_callback(self.cb_message_media, RoomMessageMedia)
         self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
 
