@@ -79,6 +79,43 @@ class MatrixClient(AsyncClient):
                 "user_id": resp.user_id
             }, f)
 
+class UrbitClient:
+    def __init__(self, instance):
+        self.instance = instance
+        self.connect()
+
+    def connect(self):
+        self.client = quinnat.Quinnat(
+                self.instance["urbit_url"],
+                self.instance["client_ship"],
+                self.instance["urbit_code"]
+        )
+        print("connecting urbit_client...")
+        self.client.connect()
+
+    def message_send(self, resource_ship, channel, message):
+        try:
+            self.client.post_message(
+                    resource_ship,
+                    channel,
+                    {"text": message}
+            )
+        except UnicodeDecodeError:
+            self.reconnect()
+
+    def reconnect(self):
+        self.client.ship.delete()
+        self.client = self.connect()
+
+class bridge:
+    def __init__(self, matrix_client, urbit_client):
+        self.matrix_client = matrix_client
+        self.urbit_client = urbit_client
+
+        matrix_client.add_event_callback(matrix_client.cb_autojoin_room, InviteEvent)
+        matrix_client.add_event_callback(matrix_client.cb_message_text, RoomMessageText)
+
+
 async def run_matrix_client(client: MatrixClient):
     await client.login()
 
@@ -97,11 +134,18 @@ async def run_matrix_client(client: MatrixClient):
 
 async def main():
     for instance in get_json_dump("config.json"):
+        urbit_config = {
+            "urbit_url": instance["urbit_url"],
+            "client_ship": instance["client_ship"],
+            "urbit_code": instance["urbit_code"]
+        }
         for bot in instance["bots"]:
-            config = ClientConfig(store_sync_tokens=True)
-            matrix_client = MatrixClient(bot["matrix_homeserver"], bot["matrix_bot_user"], store_path=bot["matrix_store_path"], config=config, password=bot["matrix_bot_pass"])
-            matrix_client.add_event_callback(matrix_client.cb_autojoin_room, InviteEvent)
-            matrix_client.add_event_callback(matrix_client.cb_message_text, RoomMessageText)
+            matrix_config = ClientConfig(store_sync_tokens=True)
+
+            matrix_client = MatrixClient(bot["matrix_homeserver"], bot["matrix_bot_user"], store_path=bot["matrix_store_path"], config=matrix_config, password=bot["matrix_bot_pass"])
+            urbit_client = UrbitClient(urbit_config)
+            bridge_instance = bridge(matrix_client, urbit_client)
+
 
             try:
                 await run_matrix_client(matrix_client)
