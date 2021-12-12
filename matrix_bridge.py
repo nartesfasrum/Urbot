@@ -4,18 +4,11 @@ from multiprocessing import active_children, Process
 from nio import Api, AsyncClient, ClientConfig, InviteEvent, LoginResponse, LocalProtocolError, MatrixRoom, MatrixUser, RoomEncryptedMedia, RoomMessageMedia, RoomMessageText, RoomSendResponse, crypto, exceptions
 
 class bridge:
-    def __init__(self, matrix_client, urbit_client, instance):
+    def __init__(self, matrix_client, s3_client, urbit_client, instance):
         self.matrix_client = matrix_client
         self.urbit_client = urbit_client
+        self.s3_client = s3_client
         self.instance = instance
-
-        self.s3_client = boto3.resource(
-            service_name = 's3',
-            aws_access_key_id = self.instance["s3_key_access"],
-            aws_secret_access_key = self.instance["s3_key_secret"],
-            endpoint_url = self.instance["s3_url"]
-        )
-        self.s3_bucket_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"]
 
         self.add_callbacks()
 
@@ -36,13 +29,7 @@ class bridge:
 
             mxc_split = event.url.split('/')
             image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
-            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
-                f.write(image_download_request.content)
-            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
-                Filename = self.instance["matrix_store_path"] + event.body,
-                Key = event.body
-            )
-            s3_attachment_url = self.s3_bucket_url + '/' + event.body
+            s3_attachment_url = self.s3_client.upload(event.body, image_download_request.content)
             print("attempting to send media to Urbit...")
             print("media to be sent: ", s3_attachment_url)
             print("media to channel:", matched_channel["urbit_channel"])
@@ -56,13 +43,7 @@ class bridge:
 
             mxc_split = event.url.split('/')
             image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
-            with open(self.instance["matrix_store_path"] + event.body, 'wb') as f:
-                f.write(image_download_request.content)
-            self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
-                Filename = self.instance["matrix_store_path"] + event.body,
-                Key = event.body
-            )
-            s3_attachment_url = self.s3_bucket_url + '/' + event.body
+            s3_attachment_url = self.s3_client.upload(event.body, image_download_request.content)
             print("attempting to send media to Urbit...")
             print("media to be sent: ", s3_attachment_url)
             print("media to channel:", matched_channel["urbit_channel"])
@@ -81,7 +62,6 @@ class bridge:
             print("message to be sent: ", message_body)
             print("message to channel:", matched_channel["urbit_channel"])
             self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
-
 
     def add_callbacks(self):
         self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
@@ -153,6 +133,29 @@ class MatrixClient(AsyncClient):
                 "user_id": resp.user_id
             }, f)
 
+class S3Client:
+    def __init__(self, instance):
+        self.instance = instance
+        self.s3_bucket_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"]
+
+        self.s3_client = boto3.resource(
+            service_name = 's3',
+            aws_access_key_id = self.instance["s3_key_access"],
+            aws_secret_access_key = self.instance["s3_key_secret"],
+            endpoint_url = self.instance["s3_url"]
+        )
+
+    def upload(self, event_body, image_download_request_content):
+        with open(self.instance["matrix_store_path"] + event_body, 'wb') as f:
+            f.write(image_download_request_content)
+        self.s3_client.Bucket(self.instance["s3_bucket"]).upload_file(
+            Filename = self.instance["matrix_store_path"] + event_body,
+            Key = event_body
+        )
+        s3_attachment_url = self.s3_bucket_url + '/' + event_body
+
+        return s3_attachment_url
+
 class UrbitClient:
     def __init__(self, instance):
         self.instance = instance
@@ -209,9 +212,9 @@ async def main():
             matrix_config = ClientConfig(store_sync_tokens=True)
 
             matrix_client = MatrixClient(bot["matrix_homeserver"], bot["matrix_bot_user"], store_path=bot["matrix_store_path"], config=matrix_config, password=bot["matrix_bot_pass"])
+            s3_client = S3Client(bot)
             urbit_client = UrbitClient(urbit_config)
-            bridge_instance = bridge(matrix_client, urbit_client, bot)
-
+            bridge_instance = bridge(matrix_client, s3_client, urbit_client, bot)
 
             try:
                 await run_matrix_client(matrix_client)
