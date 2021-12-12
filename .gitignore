@@ -353,3 +353,4 @@ MigrationBackup/
 *.swp
 config.json
 store/*.db
+matrix_credentials_cache.json

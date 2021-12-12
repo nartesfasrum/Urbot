@@ -8,14 +8,13 @@
 		"matrix_bot_user": "@urbot:matrix.example.org",
 		"matrix_bot_pass": "P@ssw0rd",
 		"matrix_store_path": "/full/path/to/store",
-		"matrix_device_id": "urbot",
 		"channels": [{
 			"resource_ship": "sampel-palnet",
 			"matrix_room": "!matrixRoom:matrix.example.org",
 			"urbit_channel": "urbit-channel-111"
 		},
 		{
-			"resource_ship": "zod",
+			"resource_ship": "wet",
 			"matrix_room": "!matrixRoomTwo:matrix.example.org",
 			"urbit_channel": "urbit-channel-222"
 		}]
