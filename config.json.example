@@ -1,0 +1,22 @@
+[{
+	"client_ship": "zod",
+	"urbit_url": "http://127.0.0.1:8080",
+	"urbit_code": "dozzod-dozzod-dozzod-dozzod",
+	"bots": [{
+		"type": "matrix",
+		"matrix_homeserver": "https://matrix.example.org",
+		"matrix_bot_user": "@urbot:matrix.example.org",
+		"matrix_bot_pass": "P@ssw0rd",
+		"matrix_store_path": "/full/path/to/store",
+		"channels": [{
+			"resource_ship": "sampel-palnet",
+			"matrix_room": "!matrixRoom:matrix.example.org",
+			"urbit_channel": "urbit-channel-111"
+		},
+		{
+			"resource_ship": "wet",
+			"matrix_room": "!matrixRoomTwo:matrix.example.org",
+			"urbit_channel": "urbit-channel-222"
+		}]
+	}]
+}]
