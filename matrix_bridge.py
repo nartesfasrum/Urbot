@@ -12,10 +12,12 @@ class matrix_client(generic_bridge):
         self.instance = instance
         self.bot_user = instance["matrix_bot_user"]
         self.bot_password = instance["matrix_bot_pass"]
+        self.device_id = instance["matrix_device_id"]
         self.homeserver = instance["matrix_homeserver"]
+        self.store_path = instance["matrix_store_path"]
         self.channel_list = []
-        self.config = ClientConfig(store_sync_tokens=True)
-        self.matrixClient = AsyncClient(self.homeserver, self.bot_user, device_id="urbot", store_path=instance["matrix_store_path"], config=self.config)
+        self.config = ClientConfig(store_sync_tokens=True, encryption_enabled=True)
+        self.matrixClient = AsyncClient(self.homeserver, self.bot_user, device_id=self.device_id, store_path=self.store_path, config=self.config)
 
         for channel_group in instance["channels"]:
             self.channel_list.append(channel_group["matrix_room"])
@@ -114,21 +116,21 @@ async def main():
         for bot in instance["bots"]:
             if bot["type"] == "matrix":
                 print("setting up bots...")
-                bridge_instance = matrix_client(bot, urb_info)
-                urblistener_instance = bridge(bot, urb_info, bridge_instance)
+                matrix_instance = matrix_client(bot, urb_info)
+                bridge_instance = bridge(bot, urb_info, matrix_instance)
             else:
                 raise Exception("bot type not implemented!")
 
             print("starting processes...")
-            response = await bridge_instance.matrixClient.login(bridge_instance.bot_password)
+            response = await matrix_instance.matrixClient.login(matrix_instance.bot_password)
             print(response)
-            urblistener_proc = Process(target=urblistener_instance.start)
+            bridge_proc = Process(target=bridge_instance.start)
 
-            urblistener_proc.start()
-            procs.append(urblistener_proc)
+            bridge_proc.start()
+            procs.append(bridge_proc)
     
-    bridge_instance.matrixClient.add_event_callback(urblistener_instance.matrix_message_handler, RoomMessageText)
+    matrix_instance.matrixClient.add_event_callback(bridge_instance.matrix_message_handler, RoomMessageText)
 
-    await bridge_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
+    await matrix_instance.matrixClient.sync_forever(timeout=30000, full_state=True)
 
 asyncio.get_event_loop().run_until_complete(main())
