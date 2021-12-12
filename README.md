@@ -10,9 +10,9 @@ Note that this software is currently under development, and I am not responsible
 
 * ~~relay text messages from a Matrix room to an Urbit chat~~ **COMPLETE**
 * relay text messages from an Urbit chat to a Matrix room
-* autojoin/autoconfig Matrix rooms when bot is invited
+* ~~autojoin~~/autoconfig Matrix rooms when bot is invited **SEMI-COMPLETE
 * relay image messages from an Urbit chat to Matrix
-* relay image messages from Matrix to an Urbit chat
+* ~~relay image messages from Matrix to an Urbit chat~~ **COMPLETE**
 * provide configuration for displaying of reactions, replies, read receipts, typing notifications from Matrix to Urbit
 * provide commands for viewing Matrix room & user metadata
 
@@ -21,6 +21,7 @@ Note that this software is currently under development, and I am not responsible
 * Quinnat
 * matrix-nio
 * an Urbit identity
+* an Urbit-compatible S3 bucket
 
 ## Setup
 
