@@ -96,10 +96,14 @@ class UrbitClient:
         self.client = self.connect()
 
 class bridge:
-    def __init__(self, matrix_client, urbit_client):
+    def __init__(self, matrix_client, urbit_client, instance):
         self.matrix_client = matrix_client
         self.urbit_client = urbit_client
+        self.instance = instance
         self.add_callbacks()
+
+        for channel in self.instance["channels"]:
+            self.urbit_client.message_send(channel['resource_ship'], channel['urbit_channel'], "Urbot has connected to this channel!")
 
     def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
         print(f"Joining invited room {room.name}...")
@@ -113,6 +117,13 @@ class bridge:
         else:
             encrypted_symbol = "u "
         print(f"{room.display_name} | {encrypted_symbol}| {room.user_name(event.sender)}: {event.body}")
+        matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
+        for matched_channel in matched_channels:
+            message_body = room.user_name(event.sender) + ": " + event.body
+            print("attempting to send message to Urbit...")
+            print("message to be sent: ", message_body)
+            print("message to channel:", matched_channel["urbit_channel"])
+            self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
 
     def add_callbacks(self):
         self.matrix_client.add_event_callback(self.cb_autojoin_room, InviteEvent)
@@ -146,7 +157,7 @@ async def main():
 
             matrix_client = MatrixClient(bot["matrix_homeserver"], bot["matrix_bot_user"], store_path=bot["matrix_store_path"], config=matrix_config, password=bot["matrix_bot_pass"])
             urbit_client = UrbitClient(urbit_config)
-            bridge_instance = bridge(matrix_client, urbit_client)
+            bridge_instance = bridge(matrix_client, urbit_client, bot)
 
 
             try:
