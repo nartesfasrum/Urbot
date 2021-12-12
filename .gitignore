@@ -352,5 +352,5 @@ MigrationBackup/
 # Project-specific files
 *.swp
 config.json
-store/*.db
+store/*
 matrix_credentials_cache.json

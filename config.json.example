@@ -7,7 +7,10 @@
 		"matrix_homeserver": "https://matrix.example.org",
 		"matrix_bot_user": "@urbot:matrix.example.org",
 		"matrix_bot_pass": "P@ssw0rd",
-		"matrix_store_path": "/full/path/to/store",
+		"s3_url": "https://s3.example.org",
+		"s3_bucket": "examplebucket",
+		"s3_key_access": "aaaaaa",
+		"s3_key_secret": "bbbbbb",
 		"channels": [{
 			"resource_ship": "sampel-palnet",
 			"matrix_room": "!matrixRoom:matrix.example.org",
