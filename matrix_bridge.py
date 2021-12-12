@@ -30,14 +30,13 @@ class bridge:
             mxc_split = event.url.split('/')
             image_download_request = requests.get(self.matrix_client.homeserver + Api.download(mxc_split[2], mxc_split[3])[1])
             s3_attachment_url = self.s3_client.upload(event.body, image_download_request.content)
-            self.log_urbit_message(s3_attachment_url, matched_channel["urbit_channel"])
+            self.urbit_client.log_urbit_message(s3_attachment_url, matched_channel["urbit_channel"])
             self.urbit_client.client.post_message(matched_channel["resource_ship"], matched_channel["urbit_channel"], {"url": f"{s3_attachment_url}"})
 
     def cb_message_text(self, room: MatrixRoom, event: RoomMessageText):
         matched_channels = self.match_channels(room)
         for matched_channel in matched_channels:
             message_body = room.user_name(event.sender) + ": " + event.body
-            self.log_urbit_message(message_body, matched_channel["urbit_channel"])
             self.urbit_client.message_send(matched_channel["resource_ship"], matched_channel["urbit_channel"], message_body)
 
     def add_callbacks(self):
@@ -46,10 +45,6 @@ class bridge:
         self.matrix_client.add_event_callback(self.cb_message_media, RoomMessageMedia)
         self.matrix_client.add_event_callback(self.cb_message_text, RoomMessageText)
 
-    def log_urbit_message(self, message, channel):
-        print("Attempting to forward event to Urbit...")
-        print("Event to be sent: ", message)
-        print("Event to channel: ", channel)
 
     def match_channels(self, room):
         matched_channels = list(filter(lambda channel: channel["matrix_room"] == room.machine_name, self.instance["channels"]))
@@ -122,7 +117,6 @@ class MatrixClient(AsyncClient):
 class S3Client:
     def __init__(self, instance):
         self.instance = instance
-        self.s3_bucket_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"]
 
         self.s3_client = boto3.resource(
             service_name = 's3',
@@ -138,7 +132,8 @@ class S3Client:
             Filename = self.instance["matrix_store_path"] + event_body,
             Key = event_body
         )
-        s3_attachment_url = self.s3_bucket_url + '/' + event_body
+
+        s3_attachment_url = self.instance["s3_url"] + '/' + self.instance["s3_bucket"] + '/' + event_body
 
         return s3_attachment_url
 
@@ -156,8 +151,14 @@ class UrbitClient:
         print("connecting urbit_client...")
         self.client.connect()
 
+    def log_urbit_message(self, message, channel):
+        print("Attempting to forward event to Urbit...")
+        print("Event to be sent: ", message)
+        print("Event to channel: ", channel)
+
     def message_send(self, resource_ship, channel, message):
         try:
+            self.log_urbit_message(message, channel)
             self.client.post_message(
                     resource_ship,
                     channel,
