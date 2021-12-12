@@ -107,7 +107,7 @@ class bridge:
 
     def cb_autojoin_room(self, room: MatrixRoom, event: InviteEvent):
         print(f"Joining invited room {room.name}...")
-        self.matrix_clientjoin(room.room_id)
+        self.matrix_client.join(room.room_id)
         room = self.matrix_client.rooms[ROOM_ID]
         print(f"Is {room.name} encrypted: {room.encrypted}")
 
